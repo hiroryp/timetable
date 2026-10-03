@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="時間割">
+  <title>時間割</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0D0F1E;
+      --surface:      #141627;
+      --cell-filled:  #1C1F35;
+      --cell-empty:   #101221;
+      --border:       #1F2240;
+      --text-primary: #E8EAF6;
+      --text-dim:     #4A4E70;
+      --text-ghost:   #252845;
+      --today-pill:   #5C4FF6;
+      --sheet-bg:     #181B2E;
+      --sheet-btn:    #242740;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'SF Pro Display', -apple-system, sans-serif;
+      background: var(--bg);
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top, 20px) 10px 48px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 0 22px;
+      gap: 5px;
+    }
+    .h-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-primary);
+    }
+    .h-sub {
+      font-size: 10.5px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Grid ── */
+    .grid-wrap { max-width: 500px; margin: 0 auto; }
+
+    .grid-row {
+      display: grid;
+      grid-template-columns: 20px repeat(5, 1fr);
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    /* Day headers */
+    .day-hd {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      padding: 7px 0;
+      border-radius: 8px;
+      letter-spacing: 0.02em;
+    }
+    .day-hd.today {
+      background: var(--today-pill);
+      color: #fff;
+    }
+
+    /* Period label */
+    .p-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .p-num {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-ghost);
+    }
+
+    /* Cells */
+    .cell {
+      border-radius: 11px;
+      height: 92px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--cell-filled);
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+    .cell:active { opacity: 0.55; }
+    .cell.empty {
+      background: var(--cell-empty);
+      border-color: transparent;
+      cursor: default;
+    }
+    .cell-stripe { height: 3px; flex-shrink: 0; }
+    .cell-body   { padding: 8px 7px; flex: 1; overflow: hidden; }
+    .cell-name {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.48;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── Bottom Sheet ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 100;
+    }
+    .overlay.on { display: block; }
+
+    .sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--sheet-bg);
+      border-radius: 22px 22px 0 0;
+      padding: 10px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(.32,.72,0,1);
+      z-index: 101;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .sheet.on { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 38px; height: 4px;
+      background: #2C3058;
+      border-radius: 2px;
+      margin: 0 auto 22px;
+    }
+
+    /* colored accent bar at top of sheet */
+    .sheet-accent {
+      height: 3px;
+      border-radius: 2px;
+      margin-bottom: 18px;
+    }
+
+    .sheet-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 500;
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+    }
+    .sheet-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.4;
+      margin-bottom: 22px;
+    }
+    .sheet-room-lbl {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 5px;
+    }
+    .sheet-room {
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: 0.06em;
+      margin-bottom: 26px;
+    }
+    .sheet-close {
+      width: 100%;
+      padding: 14px;
+      border-radius: 13px;
+      border: none;
+      background: var(--sheet-btn);
+      color: var(--text-primary);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+    }
+    .sheet-close:active { opacity: 0.6; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="h-title">時間割</div>
+  <div class="h-sub">慶應義塾大学 日吉 · 秋学期</div>
+</header>
+
+<div class="grid-wrap">
+  <div id="tt"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="close_()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-accent" id="s-accent"></div>
+  <div class="sheet-meta"  id="s-meta"></div>
+  <div class="sheet-name"  id="s-name"></div>
+  <div id="s-room-block">
+    <div class="sheet-room-lbl">教室</div>
+    <div class="sheet-room" id="s-room"></div>
+  </div>
+  <button class="sheet-close" onclick="close_()">閉じる</button>
+</div>
+
+<script>
+const C = {
+  blue:    "#60A5FA",
+  pink:    "#F472B6",
+  purple:  "#A78BFA",
+  amber:   "#FBBF24",
+  emerald: "#34D399",
+};
+
+const DATA = {
+  1: {
+    月: { name: "商業学基礎",                       room: "J24",  color: "amber"   },
+    火: { name: "総合教育セミナーDb（Ⅰ類）",          room: "224",  color: "emerald" },
+    水: { name: "英語コミュニケーションⅠb（準上級）", room: "311",  color: "blue"    },
+    木: null,
+    金: { name: "中国語Ⅱb",                         room: "333",  color: "pink"    },
+  },
+  2: {
+    月: { name: "微積分",                            room: "D307", color: "purple"  },
+    火: { name: "線形代数",                          room: "D308", color: "purple"  },
+    水: { name: "経済学基礎Ⅱ",                      room: "J11",  color: "amber"   },
+    木: null,
+    金: { name: "地域研究ー中国事情Ⅱ",              room: null,   color: "emerald" },
+  },
+  3: {
+    月: null,
+    火: null,
+    水: { name: "歴史Ⅱ",                            room: "22",   color: "emerald" },
+    木: null,
+    金: null,
+  },
+  4: {
+    月: null,
+    火: { name: "統計学基礎",                        room: null,   color: "purple"  },
+    水: { name: "英語リーディングⅠb（中級）",        room: "D407", color: "blue"    },
+    木: null,
+    金: null,
+  },
+  5: {
+    月: null,
+    火: null,
+    水: { name: "中国語Ⅰb",                         room: "307",  color: "pink"    },
+    木: null,
+    金: null,
+  },
+};
+
+const TIMES_DISPLAY = {
+  1: "9:00–10:30",
+  2: "10:45–12:15",
+  3: "13:00–14:30",
+  4: "14:45–16:15",
+  5: "16:30–18:00",
+};
+
+const DAYS    = ["月","火","水","木","金"];
+const PERIODS = [1,2,3,4,5];
+
+const DAY_IDX = [null,"月","火","水","木","金","土","日"];
+const todayDay = DAY_IDX[new Date().getDay()];
+
+const container = document.getElementById("tt");
+
+// Header row
+const hrow = document.createElement("div");
+hrow.className = "grid-row";
+hrow.innerHTML = "<div></div>" + DAYS.map(d =>
+  `<div class="day-hd${d === todayDay ? " today" : ""}">${d}</div>`
+).join("");
+container.appendChild(hrow);
+
+// Period rows
+PERIODS.forEach(p => {
+  const row = document.createElement("div");
+  row.className = "grid-row";
+
+  const lbl = document.createElement("div");
+  lbl.className = "p-label";
+  lbl.innerHTML = `<span class="p-num">${p}</span>`;
+  row.appendChild(lbl);
+
+  DAYS.forEach(d => {
+    const cell = DATA[p][d];
+    const div  = document.createElement("div");
+    if (cell) {
+      div.className = "cell";
+      div.innerHTML  = `<div class="cell-stripe" style="background:${C[cell.color]}"></div>`
+                     + `<div class="cell-body"><span class="cell-name">${cell.name}</span></div>`;
+      div.onclick = () => open_(d, p, cell);
+    } else {
+      div.className = "cell empty";
+    }
+    row.appendChild(div);
+  });
+
+  container.appendChild(row);
+});
+
+// Sheet logic
+const overlay = document.getElementById("overlay");
+const sheet   = document.getElementById("sheet");
+
+function open_(day, period, cell) {
+  document.getElementById("s-meta").textContent  = `${day}曜日 · ${period}限 · ${TIMES_DISPLAY[period]}`;
+  document.getElementById("s-name").textContent  = cell.name;
+  document.getElementById("s-accent").style.background = C[cell.color];
+
+  const rb = document.getElementById("s-room-block");
+  if (cell.room) {
+    document.getElementById("s-room").textContent = cell.room;
+    rb.style.display = "block";
+  } else {
+    rb.style.display = "none";
+  }
+  overlay.classList.add("on");
+  requestAnimationFrame(() => sheet.classList.add("on"));
+}
+
+function close_() {
+  sheet.classList.remove("on");
+  setTimeout(() => overlay.classList.remove("on"), 320);
+}
+</script>
+</body>
+</html>
